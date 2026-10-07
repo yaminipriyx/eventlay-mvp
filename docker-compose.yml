@@ -1,0 +1,34 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: eventlay-backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      FRONTEND_URL: http://localhost:8080
+    networks:
+      - eventlay-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:5000/api
+    container_name: eventlay-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - eventlay-network
+    restart: unless-stopped
+
+networks:
+  eventlay-network:
+    driver: bridge
