@@ -164,3 +164,7 @@ npm run dev
    ```
 2. Upload the contents of `frontend/dist/` to an S3 bucket configured for static web hosting or deploy directly via AWS Amplify connected to Git.
 3. Configure `VITE_API_BASE_URL` in Amplify build settings pointing to your backend endpoint (e.g., `https://api.eventlay.com/api`).
+
+## Sprint 8 CI Integration
+
+EventLay now uses Jenkins for continuous integration with GitHub and Docker.
