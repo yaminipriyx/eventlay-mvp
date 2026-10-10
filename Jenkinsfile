@@ -13,6 +13,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 echo 'Checking out EventLay source code...'
@@ -43,12 +44,15 @@ pipeline {
                     bat 'npm run build'
                 }
 
-                echo 'Build validation completed.'
+                echo 'Frontend build validation completed.'
+                echo 'Backend dependency installation completed.'
             }
         }
 
         stage('Docker Build') {
             steps {
+                echo 'Building EventLay Docker images...'
+
                 bat 'docker build -t %BACKEND_IMAGE% ./backend'
 
                 bat 'docker build --build-arg VITE_API_BASE_URL=http://localhost:5000/api -t %FRONTEND_IMAGE% ./frontend'
@@ -59,6 +63,8 @@ pipeline {
 
         stage('Docker Verification') {
             steps {
+                echo 'Verifying generated Docker images...'
+
                 bat 'docker images eventlay-mvp-backend'
                 bat 'docker images eventlay-mvp-frontend'
             }
@@ -66,11 +72,15 @@ pipeline {
 
         stage('Tag Images for Docker Hub') {
             steps {
+                echo 'Tagging images for Docker Hub...'
+
                 bat 'docker tag %BACKEND_IMAGE% %BACKEND_HUB%:build-%BUILD_NUMBER%'
                 bat 'docker tag %FRONTEND_IMAGE% %FRONTEND_HUB%:build-%BUILD_NUMBER%'
 
                 bat 'docker tag %BACKEND_IMAGE% %BACKEND_HUB%:latest'
                 bat 'docker tag %FRONTEND_IMAGE% %FRONTEND_HUB%:latest'
+
+                echo 'Docker images tagged successfully.'
             }
         }
 
@@ -85,7 +95,8 @@ pipeline {
                 ]) {
                     bat '''
                         @echo off
-                        powershell -NoProfile -NonInteractive -Command "$env:DH_TOKEN | docker login --username $env:DH_USER --password-stdin"
+                        setlocal DisableDelayedExpansion
+                        <nul set /p "=%DH_TOKEN%" | docker login --username "%DH_USER%" --password-stdin
                         if errorlevel 1 exit /b 1
                     '''
 
@@ -96,6 +107,8 @@ pipeline {
                     bat 'docker push %FRONTEND_HUB%:latest'
 
                     bat 'docker logout'
+
+                    echo 'Both Docker images pushed to Docker Hub.'
                 }
             }
         }
@@ -103,13 +116,17 @@ pipeline {
 
     post {
         success {
+            echo '========================================'
             echo 'EVENTLAY SPRINT 9 PIPELINE: SUCCESS'
             echo 'Docker images pushed to Docker Hub.'
+            echo '========================================'
         }
 
         failure {
+            echo '========================================'
             echo 'EVENTLAY SPRINT 9 PIPELINE: FAILED'
-            echo 'Check the console output for the error.'
+            echo 'Check Console Output for the error.'
+            echo '========================================'
         }
 
         always {
