@@ -1,9 +1,13 @@
+```groovy
 pipeline {
     agent any
 
     environment {
+        DOCKERHUB_USER = 'adithya3001'
         BACKEND_IMAGE  = "eventlay-mvp-backend:build-${BUILD_NUMBER}"
         FRONTEND_IMAGE = "eventlay-mvp-frontend:build-${BUILD_NUMBER}"
+        BACKEND_HUB    = "adithya3001/eventlay-mvp-backend"
+        FRONTEND_HUB   = "adithya3001/eventlay-mvp-frontend"
     }
 
     options {
@@ -15,14 +19,13 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Checking out EventLay source code from GitHub...'
-
                 checkout scm
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Installing dependencies and validating the application...'
+                echo 'Installing dependencies and building EventLay...'
 
                 dir('backend') {
                     bat 'npm ci --omit=dev'
@@ -37,14 +40,14 @@ pipeline {
 
         stage('Test / Validate') {
             steps {
-                echo 'Running application validation...'
+                echo 'Validating the frontend production build...'
 
                 dir('frontend') {
                     bat 'npm run build'
                 }
 
-                echo 'Frontend build validation completed successfully.'
-                echo 'Backend dependency installation completed successfully.'
+                echo 'Frontend build validation completed.'
+                echo 'Backend dependency installation completed.'
             }
         }
 
@@ -68,19 +71,65 @@ pipeline {
                 bat 'docker images eventlay-mvp-frontend'
             }
         }
+
+        stage('Docker Hub Login') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-eventlay',
+                        usernameVariable: 'DH_USER',
+                        passwordVariable: 'DH_TOKEN'
+                    )
+                ]) {
+                    bat 'docker login -u "%DH_USER%" --password-stdin < nul'
+                }
+            }
+        }
+
+        stage('Tag Images for Docker Hub') {
+            steps {
+                bat 'docker tag %BACKEND_IMAGE% %BACKEND_HUB%:build-%BUILD_NUMBER%'
+                bat 'docker tag %FRONTEND_IMAGE% %FRONTEND_HUB%:build-%BUILD_NUMBER%'
+
+                bat 'docker tag %BACKEND_IMAGE% %BACKEND_HUB%:latest'
+                bat 'docker tag %FRONTEND_IMAGE% %FRONTEND_HUB%:latest'
+            }
+        }
+
+        stage('Push Images to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-eventlay',
+                        usernameVariable: 'DH_USER',
+                        passwordVariable: 'DH_TOKEN'
+                    )
+                ]) {
+                    bat 'echo %DH_TOKEN% | docker login -u "%DH_USER%" --password-stdin'
+
+                    bat 'docker push %BACKEND_HUB%:build-%BUILD_NUMBER%'
+                    bat 'docker push %FRONTEND_HUB%:build-%BUILD_NUMBER%'
+
+                    bat 'docker push %BACKEND_HUB%:latest'
+                    bat 'docker push %FRONTEND_HUB%:latest'
+
+                    bat 'docker logout'
+                }
+            }
+        }
     }
 
     post {
         success {
             echo '========================================'
-            echo 'EVENTLAY CI PIPELINE: SUCCESS'
-            echo 'Docker images built successfully.'
+            echo 'EVENTLAY SPRINT 9 PIPELINE: SUCCESS'
+            echo 'Docker images pushed to Docker Hub.'
             echo '========================================'
         }
 
         failure {
             echo '========================================'
-            echo 'EVENTLAY CI PIPELINE: FAILED'
+            echo 'EVENTLAY SPRINT 9 PIPELINE: FAILED'
             echo 'Check the console output for the error.'
             echo '========================================'
         }
@@ -90,3 +139,4 @@ pipeline {
         }
     }
 }
+```
