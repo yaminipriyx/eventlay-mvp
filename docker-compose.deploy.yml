@@ -1,0 +1,22 @@
+﻿services:
+  backend:
+    image: adithya3001/eventlay-mvp-backend:${IMAGE_TAG:-latest}
+    container_name: eventlay-backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      FRONTEND_URL: http://localhost:8080
+    restart: unless-stopped
+
+  frontend:
+    image: adithya3001/eventlay-mvp-frontend:${IMAGE_TAG:-latest}
+    container_name: eventlay-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
