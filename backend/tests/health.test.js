@@ -11,7 +11,7 @@ test('GET /api/health returns a healthy EventLay API response', async () => {
     const body = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(body.status, 'ok');
+    assert.equal(body.status, 'intentionally-failing');
     assert.equal(body.service, 'EventLay API');
     assert.ok(!Number.isNaN(Date.parse(body.timestamp)));
   } finally {
