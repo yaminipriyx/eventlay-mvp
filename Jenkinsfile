@@ -234,40 +234,15 @@ pipeline {
 
         stage('Verify Deployment') {
             steps {
-                echo 'Waiting for the application to start...'
+                echo 'Verifying deployed EventLay application...'
 
                 bat '''
                     @echo off
-                    set "HEALTH_OK="
-
-                    for /L %%i in (1,1,12) do (
-                        curl.exe -fsS http://127.0.0.1:5000/api/health >nul
-                        if not errorlevel 1 (
-                            set "HEALTH_OK=1"
-                            goto :health_done
-                        )
-                        timeout /t 5 /nobreak >nul
-                    )
-
-                    :health_done
-                    if not defined HEALTH_OK (
-                        echo ERROR: Backend health check failed.
-                        exit /b 1
-                    )
-
-                    echo Backend health check passed.
-
-                    curl.exe -fsS http://127.0.0.1:8080/ -o nul
-                    if errorlevel 1 (
-                        echo ERROR: Frontend accessibility check failed.
-                        exit /b 1
-                    )
-
-                    echo Frontend accessibility check passed.
-                    docker compose -f docker-compose.deploy.yml ps
+                    node -e "const http=require('http'); const urls=[{name:'Backend',url:'http://127.0.0.1:5000/api/health'},{name:'Frontend',url:'http://127.0.0.1:8080/'}]; let i=0; function check(){if(i>=urls.length){console.log('SUCCESS: Backend and frontend are accessible.');process.exit(0);}const item=urls[i++];const req=http.get(item.url,{timeout:5000},res=>{res.resume();console.log(item.name+' HTTP status: '+res.statusCode);if(res.statusCode>=200&&res.statusCode<400){check();}else{console.error(item.name+' verification failed');process.exitCode=1;}});req.on('timeout',()=>req.destroy(new Error('Request timed out')));req.on('error',err=>{console.error(item.name+' check failed: '+err.message);process.exitCode=1;});req.on('close',()=>{if(process.exitCode===1)process.exit(1);});}check();"
+                    if errorlevel 1 exit /b 1
                 '''
 
-                echo "Deployment verified for image tag ${IMAGE_TAG}"
+                echo "Deployment verified for image tag: ${IMAGE_TAG}"
             }
         }
     }
