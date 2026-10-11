@@ -106,17 +106,65 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo "Deploying image version ${IMAGE_TAG}..."
+                echo "Preparing deployment of ${IMAGE_TAG}..."
 
-                // Pull both new images before replacing running containers.
-                bat 'docker pull %BACKEND_HUB%:%IMAGE_TAG%'
-                bat 'docker pull %FRONTEND_HUB%:%IMAGE_TAG%'
+                withCredentials([
+                    file(
+                        credentialsId: 'eventlay-backend-env',
+                        variable: 'BACKEND_ENV_FILE'
+                    )
+                ]) {
+                    powershell '''
+                        $ErrorActionPreference = "Stop"
 
-                // Replace the previous Compose-managed containers.
-                // This is reached only after tests and image pushes succeed.
-                bat 'docker rm -f eventlay-backend eventlay-frontend || exit /b 0'
+                        $targetEnv = Join-Path $env:WORKSPACE "backend\\.env"
+                        $sourceEnv = $env:BACKEND_ENV_FILE
 
-                bat 'docker compose -f docker-compose.deploy.yml up -d'
+                        if (-not (Test-Path -LiteralPath $sourceEnv)) {
+                            throw "Backend environment credential file is missing."
+                        }
+
+                        if (-not (Test-Path -LiteralPath (Split-Path $targetEnv))) {
+                            throw "Backend directory is missing from the workspace."
+                        }
+
+                        Copy-Item -LiteralPath $sourceEnv `
+                            -Destination $targetEnv -Force
+
+                        try {
+                            Write-Host "Validating Docker Compose configuration..."
+
+                            docker compose -f docker-compose.deploy.yml config --quiet
+                            if ($LASTEXITCODE -ne 0) {
+                                throw "Docker Compose configuration validation failed."
+                            }
+
+                            Write-Host "Pulling backend image..."
+                            docker pull "$env:BACKEND_HUB`:$env:IMAGE_TAG"
+                            if ($LASTEXITCODE -ne 0) {
+                                throw "Backend image pull failed."
+                            }
+
+                            Write-Host "Pulling frontend image..."
+                            docker pull "$env:FRONTEND_HUB`:$env:IMAGE_TAG"
+                            if ($LASTEXITCODE -ne 0) {
+                                throw "Frontend image pull failed."
+                            }
+
+                            Write-Host "Deploying EventLay..."
+                            docker compose -f docker-compose.deploy.yml up -d --force-recreate
+                            if ($LASTEXITCODE -ne 0) {
+                                throw "Docker Compose deployment failed."
+                            }
+
+                            Write-Host "Deployment command completed."
+                        }
+                        finally {
+                            Remove-Item -LiteralPath $targetEnv `
+                                -Force -ErrorAction SilentlyContinue
+                        }
+                    '''
+                }
             }
         }
 
@@ -156,6 +204,7 @@ pipeline {
 
                 powershell '''
                     $ErrorActionPreference = "Stop"
+
                     $response = Invoke-WebRequest `
                         -Uri "http://localhost:8080" `
                         -TimeoutSec 10
