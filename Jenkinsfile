@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -117,39 +116,53 @@ pipeline {
 
         stage('Push Images to Docker Hub') {
             steps {
-                echo 'Pushing tagged images to Docker Hub...'
+                echo 'Pushing images to Docker Hub...'
 
                 withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-eventlay',
-                        usernameVariable: 'DOCKERHUB_USER',
-                        passwordVariable: 'DOCKERHUB_TOKEN'
+                    string(
+                        credentialsId: 'dockerhub-eventlay-token',
+                        variable: 'DOCKERHUB_TOKEN'
                     )
                 ]) {
-                    bat '''
-                        @echo off
-                        echo %DOCKERHUB_TOKEN% | docker login -u "%DOCKERHUB_USER%" --password-stdin
-                        if errorlevel 1 exit /b 1
+                    script {
+                        writeFile(
+                            file: 'dockerhub-token.txt',
+                            text: env.DOCKERHUB_TOKEN
+                        )
 
-                        docker push "%BACKEND_HUB%:%IMAGE_TAG%"
-                        if errorlevel 1 goto :push_failed
+                        try {
+                            bat '''
+                                @echo off
 
-                        docker push "%FRONTEND_HUB%:%IMAGE_TAG%"
-                        if errorlevel 1 goto :push_failed
+                                docker login -u "adithya3001" --password-stdin < dockerhub-token.txt
+                                if errorlevel 1 exit /b 1
 
-                        docker push "%BACKEND_HUB%:latest"
-                        if errorlevel 1 goto :push_failed
+                                docker push "%BACKEND_HUB%:%IMAGE_TAG%"
+                                if errorlevel 1 goto :push_failed
 
-                        docker push "%FRONTEND_HUB%:latest"
-                        if errorlevel 1 goto :push_failed
+                                docker push "%FRONTEND_HUB%:%IMAGE_TAG%"
+                                if errorlevel 1 goto :push_failed
 
-                        docker logout
-                        exit /b 0
+                                docker push "%BACKEND_HUB%:latest"
+                                if errorlevel 1 goto :push_failed
 
-                        :push_failed
-                        docker logout
-                        exit /b 1
-                    '''
+                                docker push "%FRONTEND_HUB%:latest"
+                                if errorlevel 1 goto :push_failed
+
+                                docker logout
+                                exit /b 0
+
+                                :push_failed
+                                docker logout
+                                exit /b 1
+                            '''
+                        } finally {
+                            bat '''
+                                @echo off
+                                if exist dockerhub-token.txt del /f /q dockerhub-token.txt
+                            '''
+                        }
+                    }
                 }
             }
         }
