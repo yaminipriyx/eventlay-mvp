@@ -6,6 +6,7 @@ pipeline {
         FRONTEND_IMAGE = "eventlay-mvp-frontend:build-${BUILD_NUMBER}"
         BACKEND_HUB    = "adithya3001/eventlay-mvp-backend"
         FRONTEND_HUB   = "adithya3001/eventlay-mvp-frontend"
+        DOCKER_HOST = 'npipe:////./pipe/dockerDesktopLinuxEngine'
         IMAGE_TAG      = "build-${BUILD_NUMBER}"
     }
 
